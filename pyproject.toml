@@ -1,11 +1,14 @@
 [project]
 name = "torchcka"
-version = "0.1.0"
-description = "Centered Kernel Alignment for comparing PyTorch neural network representations"
+version = "1.0.0"
+description = "Centered Kernel Alignment for PyTorch models"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
-keywords = ["pytorch", "cka", "neural networks", "representation learning", "similarity"]
+license = {file = "LICENSE"}
+authors = [
+  {name = "Suhyeon (Sean) Yu", email = "suhyeon.yu.2789@gmail.com"}
+]
+keywords = ["pytorch", "cka", "centered kernel alignment", "neural networks", "machine learning", "representation", "similarity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -23,6 +26,11 @@ dependencies = [
     "matplotlib>=3.5.0",
     "tqdm>=4.60.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ryusudol/torchcka"
+Repository = "https://github.com/ryusudol/torchcka"
+Issues = "https://github.com/ryusudol/torchcka/issues"
 
 [project.optional-dependencies]
 dev = [
