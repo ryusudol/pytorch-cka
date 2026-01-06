@@ -132,6 +132,17 @@ class TestPlotCKAHeatmap:
 
         plt.close(fig)
 
+    def test_show_calls_plt_show(self, monkeypatch):
+        """Should call plt.show() when show=True."""
+        show_called = []
+        monkeypatch.setattr(plt, "show", lambda: show_called.append(True))
+
+        matrix = torch.rand(3, 3)
+        fig, ax = plot_cka_heatmap(matrix, show=True)
+
+        assert len(show_called) == 1
+        plt.close(fig)
+
 
 class TestPlotCKATrend:
     """Tests for plot_cka_trend function."""
@@ -212,6 +223,38 @@ class TestPlotCKATrend:
 
         plt.close(fig)
 
+    def test_existing_axes(self):
+        """Should plot on existing axes when provided."""
+        fig_orig, ax_orig = plt.subplots()
+        values = torch.rand(10)
+
+        fig, ax = plot_cka_trend(values, ax=ax_orig)
+
+        assert fig is fig_orig
+        assert ax is ax_orig
+        plt.close(fig)
+
+    def test_with_title(self):
+        """Should set title when provided."""
+        values = torch.rand(10)
+        title = "My CKA Trend"
+
+        fig, ax = plot_cka_trend(values, title=title)
+
+        assert ax.get_title() == title
+        plt.close(fig)
+
+    def test_show_calls_plt_show(self, monkeypatch):
+        """Should call plt.show() when show=True."""
+        show_called = []
+        monkeypatch.setattr(plt, "show", lambda: show_called.append(True))
+
+        values = torch.rand(10)  # You forgot this line!
+        fig, ax = plot_cka_trend(values, show=True)
+
+        assert len(show_called) == 1
+        plt.close(fig)
+
 
 class TestPlotCKAComparison:
     """Tests for plot_cka_comparison function."""
@@ -258,6 +301,29 @@ class TestPlotCKAComparison:
 
         # 3 plots in 2 columns = 2 rows, 1 empty
         assert not axes[1, 1].get_visible()
+        plt.close(fig)
+
+    def test_numpy_input_matrices(self):
+        """Should accept numpy arrays in matrices list."""
+        matrices = [np.random.rand(5, 5), np.random.rand(5, 5)]
+        titles = ["Matrix 1", "Matrix 2"]
+
+        fig, axes = plot_cka_comparison(matrices, titles, share_colorbar=True)
+
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
+
+    def test_show_calls_plt_show(self, monkeypatch):
+        """Should call plt.show() when show=True."""
+        show_called = []
+        monkeypatch.setattr(plt, "show", lambda: show_called.append(True))
+
+        matrices = [torch.rand(5, 5), torch.rand(5, 5)]
+        titles = ["Matrix 1", "Matrix 2"]
+
+        fig, axes = plot_cka_comparison(matrices, titles, show=True)
+
+        assert len(show_called) == 1
         plt.close(fig)
 
 

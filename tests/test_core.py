@@ -20,6 +20,16 @@ from torchcka.core import (
 class TestLinearKernel:
     """Tests for linear_kernel function."""
 
+    def test_invalid_dims(self):
+        """linear_kernel should raise ValueError for non-2D tensors."""
+        x_1d = torch.randn(10)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            linear_kernel(x_1d)
+
+        x_3d = torch.randn(5, 10, 5)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            linear_kernel(x_3d)
+
     def test_shape(self):
         """Linear kernel should produce (n, n) gram matrix."""
         x = torch.randn(10, 5)
@@ -50,6 +60,23 @@ class TestLinearKernel:
 
 class TestRBFKernel:
     """Tests for rbf_kernel function."""
+
+    def test_invalid_dims(self):
+        """rbf_kernel should raise ValueError for non-2D tensors."""
+        x_1d = torch.randn(10)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            rbf_kernel(x_1d)
+
+        x_4d = torch.randn(5, 3, 4, 4)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            rbf_kernel(x_4d)
+
+    def test_single_sample(self):
+        """rbf_kernel with n=1 should use default sigma."""
+        x = torch.randn(1, 5)
+        K = rbf_kernel(x, sigma=None)
+        assert K.shape == (1, 1)
+        assert torch.isclose(K[0, 0], torch.tensor(1.0), atol=1e-6)
 
     def test_shape(self):
         """RBF kernel should produce (n, n) gram matrix."""
@@ -119,6 +146,28 @@ class TestComputeGramMatrix:
 class TestCenterGramMatrix:
     """Tests for center_gram_matrix function."""
 
+    def test_invalid_dims(self):
+        """center_gram_matrix should raise for non-2D tensors."""
+        gram_1d = torch.randn(10)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            center_gram_matrix(gram_1d)
+
+        gram_3d = torch.randn(5, 10, 10)
+        with pytest.raises(ValueError, match="requires 2D tensor"):
+            center_gram_matrix(gram_3d)
+
+    def test_non_square(self):
+        """center_gram_matrix should raise for non-square matrices."""
+        gram_rect = torch.randn(10, 15)
+        with pytest.raises(ValueError, match="requires square matrix"):
+            center_gram_matrix(gram_rect)
+
+    def test_empty_matrix(self):
+        """center_gram_matrix should raise for empty matrix."""
+        gram_empty = torch.randn(0, 0)
+        with pytest.raises(ValueError, match="requires non-empty matrix"):
+            center_gram_matrix(gram_empty)
+
     def test_centered_sum_zero(self):
         """Centered gram matrix rows/cols should sum to ~zero."""
         x = torch.randn(10, 5, dtype=torch.float64)
@@ -137,6 +186,55 @@ class TestCenterGramMatrix:
 
 class TestHSIC:
     """Tests for HSIC functions."""
+
+    def test_biased_invalid_dims(self):
+        """hsic_biased should raise for non-2D gram matrices."""
+        gram_valid = torch.randn(10, 10)
+        gram_1d = torch.randn(10)
+
+        with pytest.raises(ValueError, match="requires 2D tensors"):
+            hsic_biased(gram_1d, gram_valid)
+
+        with pytest.raises(ValueError, match="requires 2D tensors"):
+            hsic_biased(gram_valid, gram_1d)
+
+    def test_biased_shape_mismatch(self):
+        """hsic_biased should raise when gram matrix shapes don't match."""
+        gram_10x10 = torch.randn(10, 10)
+        gram_8x8 = torch.randn(8, 8)
+
+        with pytest.raises(ValueError, match="requires matching shapes"):
+            hsic_biased(gram_10x10, gram_8x8)
+
+    def test_biased_non_square(self):
+        """hsic_biased should raise for non-square gram matrices."""
+        gram_rect = torch.randn(10, 15)
+
+        with pytest.raises(ValueError, match="requires square matrices"):
+            hsic_biased(gram_rect, gram_rect)
+
+    def test_unbiased_invalid_dims(self):
+        """hsic_unbiased should raise for non-2D tensors."""
+        gram_valid = torch.randn(10, 10)
+        gram_3d = torch.randn(5, 10, 10)
+
+        with pytest.raises(ValueError, match="requires 2D tensors"):
+            hsic_unbiased(gram_3d, gram_valid)
+
+    def test_unbiased_shape_mismatch(self):
+        """hsic_unbiased should raise for shape mismatch."""
+        gram_10x10 = torch.randn(10, 10)
+        gram_5x5 = torch.randn(5, 5)
+
+        with pytest.raises(ValueError, match="requires matching shapes"):
+            hsic_unbiased(gram_10x10, gram_5x5)
+
+    def test_unbiased_non_square(self):
+        """hsic_unbiased should raise for non-square matrices."""
+        gram_rect = torch.randn(10, 15)
+
+        with pytest.raises(ValueError, match="requires square matrices"):
+            hsic_unbiased(gram_rect, gram_rect)
 
     def test_biased_requires_n_gt_1(self):
         """Biased HSIC should raise error for n <= 1."""
@@ -259,4 +357,11 @@ class TestCKA:
         x = torch.randn(10, 5, dtype=torch.float64)
         # Pass same tensor twice - should trigger optimization
         cka_val = cka(x, x)
+        assert torch.isclose(cka_val, torch.tensor(1.0, dtype=torch.float64), atol=1e-6)
+
+    def test_cka_from_gram_same_matrix_optimization(self):
+        """cka_from_gram should optimize when same gram matrix passed twice."""
+        x = torch.randn(10, 5, dtype=torch.float64)
+        gram_x = linear_kernel(x)
+        cka_val = cka_from_gram(gram_x, gram_x)
         assert torch.isclose(cka_val, torch.tensor(1.0, dtype=torch.float64), atol=1e-6)
