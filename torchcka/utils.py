@@ -61,6 +61,38 @@ def get_all_layer_names(model: nn.Module, include_root: bool = False) -> List[st
     return names
 
 
+def auto_select_layers(
+    model: nn.Module,
+    max_layers: int = 50,
+    model_name: str = "Model",
+) -> Tuple[List[str], bool]:
+    """Auto-select layers from a model with optional truncation.
+
+    Args:
+        model: PyTorch model to extract layers from.
+        max_layers: Maximum number of layers to select.
+        model_name: Name to use in warning message.
+
+    Returns:
+        Tuple of (selected_layers, truncated).
+    """
+    import warnings
+
+    all_layers = get_all_layer_names(model)
+    truncated = len(all_layers) > max_layers
+
+    if truncated:
+        selected = all_layers[:max_layers]
+        warnings.warn(
+            f"{model_name} has {len(all_layers)} layers. Auto-selected first {max_layers}. "
+            "Consider specifying layers explicitly for better control."
+        )
+    else:
+        selected = all_layers
+
+    return selected, truncated
+
+
 def get_device(
     model: nn.Module,
     fallback: Optional[torch.device] = None,
