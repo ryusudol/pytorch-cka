@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from torchcka import CKA, CKAConfig, plot_cka_heatmap, plot_cka_trend
+from pytorch_cka import CKA, CKAConfig, plot_cka_heatmap, plot_cka_trend
 
 
 # =============================================================================
@@ -280,7 +280,7 @@ def example_checkpoint():
 def main():
     """Run all examples."""
     print("=" * 60)
-    print("torchcka Examples")
+    print("pytorch-cka Examples")
     print("=" * 60)
 
     example_self_comparison()
