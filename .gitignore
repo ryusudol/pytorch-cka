@@ -62,5 +62,4 @@ cka_checkpoint.pt
 # mypy
 .mypy_cache/
 
-# UV lock file (optional - can include if you want reproducible builds)
-# uv.lock
+uv.lock
