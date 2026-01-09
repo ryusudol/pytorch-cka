@@ -181,11 +181,10 @@ fig, axes = plot_cka_comparison(
 
 ### Core Functions
 
-| Function                 | Description                                 |
-| ------------------------ | ------------------------------------------- |
-| `cka(X, Y, ...)`         | Compute CKA between two activation matrices |
-| `hsic(K, L, ...)`        | Compute HSIC between two Gram matrices      |
-| `compute_gram_matrix(X)` | Compute Gram matrix using linear kernel     |
+| Function                 | Description                            |
+| ------------------------ | -------------------------------------- |
+| `hsic(K, L, ...)`        | Compute HSIC between two Gram matrices |
+| `compute_gram_matrix(X)` | Compute Gram matrix using linear kernel|
 
 ### Utilities
 
