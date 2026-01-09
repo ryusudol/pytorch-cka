@@ -87,10 +87,15 @@ class CKA:
         self.model1_name = model1_name or self.model1.__class__.__name__
         self.model2_name = model2_name or self.model2.__class__.__name__
 
-        self._features1 = FeatureCache(detach=True)
-        self._features2 = FeatureCache(detach=True)
+        self._is_same_model = self.model1 is self.model2
+        self._is_same_layers = (
+            self._is_same_model and self.model1_layers == self.model2_layers
+        )
 
-        # Hook handles for cleanup
+        self._features1 = FeatureCache(detach=True)
+        # _features1 stores features for the union of model1_layers and model2_layers when _is_same_model is True
+        self._features2 = self._features1 if self._is_same_model else FeatureCache(detach=True)
+
         self._hook_handles: List[torch.utils.hooks.RemovableHandle] = []
 
         self._model1_training: Optional[bool] = None
@@ -150,7 +155,7 @@ class CKA:
             # Handle HuggingFace ModelOutput objects (e.g., BaseModelOutput)
             elif hasattr(output, "last_hidden_state"):
                 output = output.last_hidden_state
-            # Skip non-tensor outputs
+
             if not isinstance(output, torch.Tensor):
                 return
             cache.store(layer_name, output)
@@ -162,47 +167,74 @@ class CKA:
         if self._hook_handles:
             return
 
-        # Register hooks for model1
-        found1 = set()
-        for name, module in self.model1.named_modules():
-            if name in self.model1_layers:
-                handle = module.register_forward_hook(
-                    self._make_hook(self._features1, name)
+        if self._is_same_model:
+            all_layers = set(self.model1_layers) | set(self.model2_layers)
+            found = set()
+            for name, module in self.model1.named_modules():
+                if name in all_layers:
+                    handle = module.register_forward_hook(
+                        self._make_hook(self._features1, name)
+                    )
+                    self._hook_handles.append(handle)
+                    found.add(name)
+
+            found1 = found & set(self.model1_layers)
+            found2 = found & set(self.model2_layers)
+
+            missing1 = set(self.model1_layers) - found1
+            if missing1:
+                warnings.warn(f"Layers not found in model: {sorted(missing1)}")
+
+            if not found1:
+                raise ValueError(
+                    "No valid layers found in model1. "
+                    "Use model.named_modules() to see available layers."
                 )
-                self._hook_handles.append(handle)
-                found1.add(name)
-
-        # Warn about missing layers in model1
-        missing1 = set(self.model1_layers) - found1
-        if missing1:
-            warnings.warn(f"Layers not found in model1: {sorted(missing1)}")
-
-        # Register hooks for model2
-        found2 = set()
-        for name, module in self.model2.named_modules():
-            if name in self.model2_layers:
-                handle = module.register_forward_hook(
-                    self._make_hook(self._features2, name)
+            if not found2:
+                raise ValueError(
+                    "No valid layers found in model2. "
+                    "Use model.named_modules() to see available layers."
                 )
-                self._hook_handles.append(handle)
-                found2.add(name)
+        else:
+            # Register hooks for model1
+            found1 = set()
+            for name, module in self.model1.named_modules():
+                if name in self.model1_layers:
+                    handle = module.register_forward_hook(
+                        self._make_hook(self._features1, name)
+                    )
+                    self._hook_handles.append(handle)
+                    found1.add(name)
 
-        # Warn about missing layers in model2
-        missing2 = set(self.model2_layers) - found2
-        if missing2:
-            warnings.warn(f"Layers not found in model2: {sorted(missing2)}")
+            missing1 = set(self.model1_layers) - found1
+            if missing1:
+                warnings.warn(f"Layers not found in model1: {sorted(missing1)}")
 
-        # Raise if no valid layers found in either model
-        if not found1:
-            raise ValueError(
-                "No valid layers found in model1. "
-                "Use model.named_modules() to see available layers."
-            )
-        if not found2:
-            raise ValueError(
-                "No valid layers found in model2. "
-                "Use model.named_modules() to see available layers."
-            )
+            # Register hooks for model2
+            found2 = set()
+            for name, module in self.model2.named_modules():
+                if name in self.model2_layers:
+                    handle = module.register_forward_hook(
+                        self._make_hook(self._features2, name)
+                    )
+                    self._hook_handles.append(handle)
+                    found2.add(name)
+
+            missing2 = set(self.model2_layers) - found2
+            if missing2:
+                warnings.warn(f"Layers not found in model2: {sorted(missing2)}")
+
+            # Raise if no valid layers found in either model
+            if not found1:
+                raise ValueError(
+                    "No valid layers found in model1. "
+                    "Use model.named_modules() to see available layers."
+                )
+            if not found2:
+                raise ValueError(
+                    "No valid layers found in model2. "
+                    "Use model.named_modules() to see available layers."
+                )
 
 
     def _remove_hooks(self) -> None:
@@ -260,7 +292,6 @@ class CKA:
         n_layers1 = len(self.model1_layers)
         n_layers2 = len(self.model2_layers)
 
-        # Accumulators for minibatch CKA
         hsic_xy = torch.zeros(n_layers1, n_layers2, device=self.device)
         hsic_xx = torch.zeros(n_layers1, device=self.device)
         hsic_yy = torch.zeros(n_layers2, device=self.device)
@@ -273,21 +304,20 @@ class CKA:
 
         with torch.no_grad():
             for batch_idx, (batch1, batch2) in enumerate(iterator):
-                # Clear previous features
                 self._features1.clear()
-                self._features2.clear()
+                if not self._is_same_model:
+                    self._features2.clear()
 
                 x1 = self._extract_input(batch1)
-                x2 = self._extract_input(batch2)
-
                 validate_batch_size(x1.shape[0])
-
                 x1 = x1.to(self.device)
-                x2 = x2.to(self.device)
 
-                # Forward pass for both models
                 self.model1(x1)
-                self.model2(x2)
+
+                if not self._is_same_model:
+                    x2 = self._extract_input(batch2)
+                    x2 = x2.to(self.device)
+                    self.model2(x2)
 
                 self._accumulate_hsic(hsic_xy, hsic_xx, hsic_yy)
 
@@ -295,7 +325,6 @@ class CKA:
                     current_cka = self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
                     callback(batch_idx, total_batches, current_cka)
 
-        # Compute final CKA matrix
         cka_matrix = self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
 
         return cka_matrix
@@ -360,42 +389,123 @@ class CKA:
             hsic_xx: Accumulator for HSIC(K, K), shape (n_layers1,).
             hsic_yy: Accumulator for HSIC(L, L), shape (n_layers2,).
         """
-        gram1_cache: Dict[str, torch.Tensor] = {}
-        gram2_cache: Dict[str, torch.Tensor] = {}
+        if self._is_same_layers:
+            self._accumulate_hsic_symmetric(hsic_xy, hsic_xx, hsic_yy)
+            return
 
-        # Cache gram matrices and HSIC(K, K) for model1
-        for i, layer1 in enumerate(self.model1_layers):
-            feat1 = self._features1.get(layer1)
-            if feat1 is None:
+        if self._is_same_model:
+            gram_cache: Dict[str, torch.Tensor] = {}
+            hsic_cache: Dict[str, torch.Tensor] = {}
+
+            all_layers = set(self.model1_layers) | set(self.model2_layers)
+            for layer in all_layers:
+                feat = self._features1.get(layer)
+                if feat is None:
+                    continue
+
+                gram, hsic_self = self._prepare_gram_and_self_hsic(feat)
+                gram_cache[layer] = gram
+                hsic_cache[layer] = hsic_self
+
+            for i, layer1 in enumerate(self.model1_layers):
+                if layer1 in hsic_cache:
+                    hsic_xx[i] += hsic_cache[layer1]
+
+            for j, layer2 in enumerate(self.model2_layers):
+                if layer2 in hsic_cache:
+                    hsic_yy[j] += hsic_cache[layer2]
+
+            for i, layer1 in enumerate(self.model1_layers):
+                gram1 = gram_cache.get(layer1)
+                if gram1 is None:
+                    continue
+
+                for j, layer2 in enumerate(self.model2_layers):
+                    gram2 = gram_cache.get(layer2)
+                    if gram2 is None:
+                        continue
+
+                    hsic_kl = hsic(gram1, gram2)
+                    hsic_xy[i, j] += hsic_kl
+        else:
+            gram1_cache: Dict[str, torch.Tensor] = {}
+            gram2_cache: Dict[str, torch.Tensor] = {}
+
+            for i, layer1 in enumerate(self.model1_layers):
+                feat1 = self._features1.get(layer1)
+                if feat1 is None:
+                    continue
+
+                gram1, hsic_kk = self._prepare_gram_and_self_hsic(feat1)
+                gram1_cache[layer1] = gram1
+                hsic_xx[i] += hsic_kk
+
+            for j, layer2 in enumerate(self.model2_layers):
+                feat2 = self._features2.get(layer2)
+                if feat2 is None:
+                    continue
+
+                gram2, hsic_ll = self._prepare_gram_and_self_hsic(feat2)
+                gram2_cache[layer2] = gram2
+                hsic_yy[j] += hsic_ll
+
+            for i, layer1 in enumerate(self.model1_layers):
+                gram1 = gram1_cache.get(layer1)
+                if gram1 is None:
+                    continue
+
+                for j, layer2 in enumerate(self.model2_layers):
+                    gram2 = gram2_cache.get(layer2)
+                    if gram2 is None:
+                        continue
+
+                    hsic_kl = hsic(gram1, gram2)
+                    hsic_xy[i, j] += hsic_kl
+
+    def _accumulate_hsic_symmetric(
+        self,
+        hsic_xy: torch.Tensor,
+        hsic_xx: torch.Tensor,
+        hsic_yy: torch.Tensor,
+    ) -> None:
+        """Accumulate HSIC values for symmetric case (same model + same layers).
+
+        Optimizations:
+        - hsic_xx == hsic_yy (compute once)
+        - hsic_xy is symmetric (compute upper triangle only)
+
+        Args:
+            hsic_xy: Accumulator for HSIC(K, L), shape (n_layers, n_layers).
+            hsic_xx: Accumulator for HSIC(K, K), shape (n_layers,).
+            hsic_yy: Accumulator for HSIC(L, L), shape (n_layers,).
+        """
+        gram_cache: Dict[str, torch.Tensor] = {}
+
+        for i, layer in enumerate(self.model1_layers):
+            feat = self._features1.get(layer)
+            if feat is None:
                 continue
 
-            gram1, hsic_kk = self._prepare_gram_and_self_hsic(feat1)
-            gram1_cache[layer1] = gram1
-            hsic_xx[i] += hsic_kk
+            gram, hsic_self = self._prepare_gram_and_self_hsic(feat)
+            gram_cache[layer] = gram
+            hsic_xx[i] += hsic_self
+            hsic_yy[i] += hsic_self
 
-        # Cache gram matrices and HSIC(L, L) for model2
-        for j, layer2 in enumerate(self.model2_layers):
-            feat2 = self._features2.get(layer2)
-            if feat2 is None:
-                continue
-
-            gram2, hsic_ll = self._prepare_gram_and_self_hsic(feat2)
-            gram2_cache[layer2] = gram2
-            hsic_yy[j] += hsic_ll
-
-        # Compute cross-HSIC for all layer pairs
         for i, layer1 in enumerate(self.model1_layers):
-            gram1 = gram1_cache.get(layer1)
+            gram1 = gram_cache.get(layer1)
             if gram1 is None:
                 continue
 
-            for j, layer2 in enumerate(self.model2_layers):
-                gram2 = gram2_cache.get(layer2)
+            for j in range(i, len(self.model1_layers)):
+                layer2 = self.model1_layers[j]
+                gram2 = gram_cache.get(layer2)
                 if gram2 is None:
                     continue
 
                 hsic_kl = hsic(gram1, gram2)
                 hsic_xy[i, j] += hsic_kl
+                if i != j:
+                    hsic_xy[j, i] += hsic_kl
 
     def _compute_cka_matrix(
         self,

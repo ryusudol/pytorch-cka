@@ -28,7 +28,6 @@ from .core import (
 )
 from .utils import (
     FeatureCache,
-    eval_mode,
     get_device,
     unwrap_model,
     validate_batch_size,
@@ -57,7 +56,6 @@ __all__ = [
     "get_device",
     "unwrap_model",
     "FeatureCache",
-    "eval_mode",
     # Visualization
     "plot_cka_heatmap",
     "plot_cka_trend",

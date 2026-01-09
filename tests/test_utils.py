@@ -6,7 +6,6 @@ import torch.nn as nn
 
 from pytorch_cka.utils import (
     FeatureCache,
-    eval_mode,
     get_device,
     unwrap_model,
     validate_batch_size,
@@ -149,48 +148,3 @@ class TestFeatureCache:
 
         assert "layer1" in cache
         assert "layer2" not in cache
-
-
-class TestEvalMode:
-    """Tests for eval_mode context manager."""
-
-    def test_sets_eval_mode(self):
-        """Should set model to eval mode inside context."""
-        model = SimpleModel()
-        model.train()
-
-        with eval_mode(model) as m:
-            assert not m.training
-
-    def test_restores_training_mode(self):
-        """Should restore training mode after context."""
-        model = SimpleModel()
-        model.train()
-
-        with eval_mode(model):
-            pass
-
-        assert model.training
-
-    def test_preserves_eval_mode(self):
-        """Should keep eval mode if started in eval."""
-        model = SimpleModel()
-        model.eval()
-
-        with eval_mode(model):
-            pass
-
-        assert not model.training  # Still in eval
-
-    def test_exception_restores_state(self):
-        """Should restore state even when exception occurs."""
-        model = SimpleModel()
-        model.train()
-
-        with pytest.raises(RuntimeError):
-            with eval_mode(model):
-                assert not model.training
-                raise RuntimeError("Test exception")
-
-        # Should be restored despite exception
-        assert model.training

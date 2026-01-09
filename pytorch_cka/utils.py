@@ -1,6 +1,5 @@
 """Utility functions for CKA computation."""
 
-from contextlib import contextmanager
 from typing import Dict, Iterator, Optional, Tuple
 
 import torch
@@ -123,23 +122,3 @@ class FeatureCache:
     def __contains__(self, name: str) -> bool:
         """Check if a layer name is in cache."""
         return name in self._features
-
-
-@contextmanager
-def eval_mode(model: nn.Module) -> Iterator[nn.Module]:
-    """Context manager to temporarily set model to eval mode.
-
-    Restores original training state on exit.
-
-    Args:
-        model: PyTorch model.
-
-    Yields:
-        The model in eval mode.
-    """
-    was_training = model.training
-    try:
-        model.eval()
-        yield model
-    finally:
-        model.train(was_training)

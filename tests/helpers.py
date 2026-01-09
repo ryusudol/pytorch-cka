@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader, TensorDataset
 # SHARED CONSTANTS
 # ============================================================================
 
-TEST_BATCH_SIZE = 8  # Must be > 3 for unbiased HSIC
-TEST_NUM_SAMPLES = 16  # Small for CI (2 batches)
+TEST_BATCH_SIZE = 16  # Must be > 3 for unbiased HSIC; 16 improves numerical stability
+TEST_NUM_SAMPLES = 32  # Small for CI (2 batches)
 TEST_IMAGE_SIZE = 224  # Standard ImageNet input size
 TEST_SEQ_LENGTH = 32  # Short sequence for speed
 
