@@ -115,11 +115,18 @@ fig, ax = plot_cka_heatmap(
 )
 ```
 
-![Self-comparison heatmap](plots/heatmap_self.png)
-
-![Cross-model comparison heatmap](plots/heatmap_cross.png)
-
-![Masked upper triangle heatmap](plots/heatmap_masked.png)
+<table>
+    <tr>
+      <td><img src="plots/heatmap_self.png" alt="Self-comparison heatmap" width="100%"/></td>
+      <td><img src="plots/heatmap_cross.png" alt="Cross-model comparison heatmap" width="100%"/></td>
+      <td><img src="plots/heatmap_masked.png" alt="Masked upper triangle heatmap" width="100%"/></td>
+    </tr>
+    <tr>
+      <td align="center">Self-comparison</td>
+      <td align="center">Cross-model</td>
+      <td align="center">Masked Upper</td>
+    </tr>
+</table>
 
 **Trend Plot**
 
@@ -136,9 +143,16 @@ fig, ax = plot_cka_trend(
 )
 ```
 
-![Single trend plot](plots/trend_single.png)
-
-![Multiple trends comparison](plots/trend_multi.png)
+<table>
+    <tr>
+      <td><img src="plots/trend_single.png" alt="Single trend plot" width="100%"/></td>
+      <td><img src="plots/trend_multi.png" alt="Multiple trends comparison" width="100%"/></td>
+    </tr>
+    <tr>
+      <td align="center">Single Trend</td>
+      <td align="center">Multiple Trends</td>
+    </tr>
+</table>
 
 **Side-by-Side Comparison**
 
@@ -153,7 +167,14 @@ fig, axes = plot_cka_comparison(
 )
 ```
 
-![CKA comparison grid](plots/comparison_grid.png)
+<table>
+    <tr>
+      <td><img src="plots/comparison_grid.png" alt="CKA comparison grid" width="100%"/></td>
+    </tr>
+    <tr>
+      <td align="center">CKA comparison grid</td>
+    </tr>
+</table>
 
 
 ## 📚 References
