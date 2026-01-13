@@ -1,37 +1,20 @@
 <div align="center">
     
-# 🚀 PyTorch-CKA
+# PyTorch-CKA
 
 **Centered Kernel Alignment (CKA) for PyTorch**
 
 Fast, memory-efficient, and numerically stable Centered Kernel Alignment (CKA) for layer-wise similarity analysis.
-
-[![PyPI](https://img.shields.io/pypi/v/pytorch_cka?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/pytorch_cka/)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 </div>
 
 
 ## ✨ Key Features
 
-- **Fast** — optimized HSIC core + same-model single-pass optimization
 - **Memory-efficient** — minibatch CKA without full-dataset loading
 - **Safe & automatic** — context manager handles hooks and cleanup
 - **Publication-ready plots** — heatmaps, trends, and comparison grids
 - **Production-ready** — HuggingFace, DataParallel/DDP, auto layer selection
-
-
-## ✍🏼 About CKA
-
-**CKA** is a similarity metric for comparing representations learned by neural networks, based on the Hilbert-Schmidt Independence Criterion (HSIC). It answers the question: _"How similar are the features learned by two layers (or models)?"_
-
-Given two matrices $X \in \mathbb{R}^{n \times p_1}$ and $Y \in \mathbb{R}^{n \times p_2}$ representing layer activations for $n$ samples, CKA computes:
-
-$$\text{CKA}(K, L) = \frac{\text{HSIC}(K, L)}{\sqrt{\text{HSIC}(K, K) \cdot \text{HSIC}(L, L)}}$$
-
-where $K = XX^T$ and $L = YY^T$ are Gram matrices, and HSIC measures statistical dependence between them.
 
 
 ## 📦 Installation
@@ -87,14 +70,6 @@ with cka:
     cka_result = cka.export(cka_matrix)
 ```
 
-### Real-time Monitoring
-
-```python
-def progress_callback(batch_idx: int, total: int, current_matrix: torch.Tensor):
-    print(f"Batch {batch_idx}/{total} | Mean CKA: {current_matrix.mean():.4f}")
-
-cka.compare(dataloader, callback=progress_callback)
-```
 
 ### Visualization
 
