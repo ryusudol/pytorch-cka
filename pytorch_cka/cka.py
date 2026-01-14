@@ -119,9 +119,10 @@ class CKA:
         exc_val: Optional[BaseException],
         exc_tb: Optional[Any],
     ) -> bool:
-        """Exit context: remove hooks and restore training state."""
+        """Exit context: remove hooks, restore training state, and clear features."""
         self._remove_hooks()
         self._restore_training_state()
+        self._clear_features()
         return False
 
     # =========================================================================
@@ -256,6 +257,11 @@ class CKA:
             self.model1.train(self._model1_training)
         if self._model2_training is not None:
             self.model2.train(self._model2_training)
+
+    def _clear_features(self) -> None:
+        self._features1.clear()
+        if not self._is_same_model:
+            self._features2.clear()
 
     # =========================================================================
     # MAIN API
