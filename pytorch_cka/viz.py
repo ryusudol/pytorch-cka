@@ -4,7 +4,7 @@ This module provides publication-quality visualization functions that
 always return (Figure, Axes) tuples for further customization.
 """
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 
 
 def plot_cka_heatmap(
-    cka_matrix: Union[torch.Tensor, np.ndarray],
+    cka_matrix: torch.Tensor | np.ndarray,
     layers1: Optional[List[str]] = None,
     layers2: Optional[List[str]] = None,
     model1_name: str = "Model 1",
@@ -159,9 +159,9 @@ def plot_cka_heatmap(
 
 
 def plot_cka_trend(
-    cka_values: Union[torch.Tensor, List[torch.Tensor], np.ndarray, List[np.ndarray]],
+    cka_values: torch.Tensor | List[torch.Tensor] | np.ndarray | List[np.ndarray],
     labels: Optional[List[str]] = None,
-    x_values: Optional[List[Union[int, float]]] = None,
+    x_values: Optional[List[int | float]] = None,
     xlabel: str = "Layer",
     ylabel: str = "CKA Similarity",
     title: Optional[str] = None,
@@ -260,7 +260,7 @@ def plot_cka_trend(
 
 
 def plot_cka_comparison(
-    matrices: List[Union[torch.Tensor, np.ndarray]],
+    matrices: List[torch.Tensor | np.ndarray],
     titles: List[str],
     layers: Optional[List[str]] = None,
     ncols: int = 2,
