@@ -7,22 +7,10 @@ from torch.types import Device
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .core import compute_gram_matrix, hsic
-from .utils import (
-    FeatureCache,
-    get_device,
-    unwrap_model,
-    validate_batch_size,
-)
+from .hsic import hsic, hsic_outer
 
 
 class CKA:
-    """Centered Kernel Alignment for comparing neural network representations.
-
-    This class provides a context-manager-based API for safe hook management
-    and efficient CKA computation between model layers.
-    """
-
     @staticmethod
     def _resolve_layers(
         model: nn.Module,
@@ -42,10 +30,7 @@ class CKA:
             if isinstance(layer, str):
                 name = layer
             elif isinstance(layer, int):
-                if layer < 0:
-                    idx = n_layers + layer
-                else:
-                    idx = layer
+                idx = layer if layer >= 0 else n_layers + layer
 
                 if idx < 0 or idx >= n_layers:
                     raise IndexError(
@@ -75,35 +60,22 @@ class CKA:
         model2_layers: Sequence[str | int] | None = None,
         device: Device = None,
     ) -> None:
-        """Initialize CKA analyzer.
+        def unwrap(m: nn.Module) -> nn.Module:
+            if isinstance(m, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
+                return m.module
+            return m
 
-        Args:
-            model1: First model to compare.
-            model2: Second model to compare.
-            model1_name: Display name for model1.
-            model2_name: Display name for model2.
-            model1_layers: Layers to hook in model1. Can be:
-                - None: Uses all layers (with warning if > 150).
-                - Sequence of strings: Layer names (e.g., ["conv1", "fc"]).
-                - Sequence of integers: Layer indices (e.g., [0, 1, -1]).
-                  Negative indices count from the end (Python-style).
-                - Mixed sequence: Combination of strings and integers.
-                Duplicates are removed, keeping only the first occurrence.
-            model2_layers: Layers to hook in model2. Same format as model1_layers.
-            device: Device for computation. If None, auto-detects from model.
+        self.model1 = unwrap(model1)
+        self.model2 = unwrap(model2)
 
-        Raises:
-            ValueError: If no valid layers are found.
-            TypeError: If layer specifications contain non-string/integer values.
-            IndexError: If layer indices are out of range.
-        """
-        # Unwrap DataParallel/DDP
-        self.model1 = unwrap_model(model1)
-        self.model2 = unwrap_model(model2)
+        if device:
+            self.device = torch.device(device)
+        else:
+            try:
+                self.device = next(self.model1.parameters()).device
+            except StopIteration:
+                self.device = torch.device("cpu")
 
-        self.device = torch.device(device) if device else get_device(self.model1)
-
-        # Resolve layer specifications (convert indices to names)
         model1_layers = self._resolve_layers(self.model1, model1_layers, "model1")
         model2_layers = self._resolve_layers(self.model2, model2_layers, "model2")
 
@@ -130,18 +102,27 @@ class CKA:
 
         self._is_same_model = self.model1 is self.model2
 
-        self._features1 = FeatureCache(detach=True)
-        self._features2 = self._features1 if self._is_same_model else FeatureCache(detach=True)
+        self._features1: list[torch.Tensor | None] = [None] * len(self.model1_layers)
+        self._layer_to_idx1: dict[str, int] = {
+            name: i for i, name in enumerate(self.model1_layers)
+        }
+
+        if self._is_same_model:
+            all_layers = list(dict.fromkeys(self.model1_layers + self.model2_layers))
+            self._features_shared: list[torch.Tensor | None] = [None] * len(all_layers)
+            self._layer_to_idx_shared: dict[str, int] = {
+                name: i for i, name in enumerate(all_layers)
+            }
+        else:
+            self._features2: list[torch.Tensor | None] = [None] * len(self.model2_layers)
+            self._layer_to_idx2: dict[str, int] = {
+                name: i for i, name in enumerate(self.model2_layers)
+            }
 
         self._hook_handles: List[torch.utils.hooks.RemovableHandle] = []
 
         self._model1_training: bool | None = None
         self._model2_training: bool | None = None
-
-
-    # =========================================================================
-    # CONTEXT MANAGER PROTOCOL
-    # =========================================================================
 
     def __enter__(self) -> "CKA":
         self._register_hooks()
@@ -161,33 +142,28 @@ class CKA:
         self._clear_features()
         return False
 
-    # =========================================================================
-    # HOOK MANAGEMENT
-    # =========================================================================
-
     def _make_hook(
         self,
-        cache: FeatureCache,
+        features_list: list[torch.Tensor | None],
+        layer_to_idx: dict[str, int],
         layer_name: str,
     ) -> Callable[[nn.Module, Tuple[torch.Tensor, ...], torch.Tensor], None]:
+        idx = layer_to_idx[layer_name]
+
         def hook(
             module: nn.Module,
             input: Tuple[torch.Tensor, ...],
             output: torch.Tensor,
         ) -> None:
-            # Handle tuple outputs (e.g., from attention layers)
             if isinstance(output, tuple):
                 output = output[0]
-            # Handle HuggingFace ModelOutput objects (e.g., BaseModelOutput)
             elif hasattr(output, "last_hidden_state"):
                 output = output.last_hidden_state
 
-            if not isinstance(output, torch.Tensor):
-                return
-            cache.store(layer_name, output)
+            if isinstance(output, torch.Tensor):
+                features_list[idx] = output.detach()
 
         return hook
-
 
     def _register_hooks(self) -> None:
         if self._hook_handles:
@@ -199,7 +175,9 @@ class CKA:
             for name, module in self.model1.named_modules():
                 if name in all_layers:
                     handle = module.register_forward_hook(
-                        self._make_hook(self._features1, name)
+                        self._make_hook(
+                            self._features_shared, self._layer_to_idx_shared, name
+                        )
                     )
                     self._hook_handles.append(handle)
                     found.add(name)
@@ -222,12 +200,11 @@ class CKA:
                     "Use model.named_modules() to see available layers."
                 )
         else:
-            # Register hooks for model1
             found1 = set()
             for name, module in self.model1.named_modules():
                 if name in self.model1_layers:
                     handle = module.register_forward_hook(
-                        self._make_hook(self._features1, name)
+                        self._make_hook(self._features1, self._layer_to_idx1, name)
                     )
                     self._hook_handles.append(handle)
                     found1.add(name)
@@ -236,12 +213,11 @@ class CKA:
             if missing1:
                 warnings.warn(f"Layers not found in model1: {sorted(missing1)}")
 
-            # Register hooks for model2
             found2 = set()
             for name, module in self.model2.named_modules():
                 if name in self.model2_layers:
                     handle = module.register_forward_hook(
-                        self._make_hook(self._features2, name)
+                        self._make_hook(self._features2, self._layer_to_idx2, name)
                     )
                     self._hook_handles.append(handle)
                     found2.add(name)
@@ -250,7 +226,6 @@ class CKA:
             if missing2:
                 warnings.warn(f"Layers not found in model2: {sorted(missing2)}")
 
-            # Raise if no valid layers found in either model
             if not found1:
                 raise ValueError(
                     "No valid layers found in model1. "
@@ -262,17 +237,14 @@ class CKA:
                     "Use model.named_modules() to see available layers."
                 )
 
-
     def _remove_hooks(self) -> None:
         for handle in self._hook_handles:
             handle.remove()
         self._hook_handles.clear()
 
-
     def _save_training_state(self) -> None:
         self._model1_training = self.model1.training
         self._model2_training = self.model2.training
-
 
     def _restore_training_state(self) -> None:
         if self._model1_training is not None:
@@ -281,13 +253,14 @@ class CKA:
             self.model2.train(self._model2_training)
 
     def _clear_features(self) -> None:
-        self._features1.clear()
-        if not self._is_same_model:
-            self._features2.clear()
-
-    # =========================================================================
-    # MAIN API
-    # =========================================================================
+        if self._is_same_model:
+            for i in range(len(self._features_shared)):
+                self._features_shared[i] = None
+        else:
+            for i in range(len(self._features1)):
+                self._features1[i] = None
+            for i in range(len(self._features2)):
+                self._features2[i] = None
 
     def compare(
         self,
@@ -296,20 +269,6 @@ class CKA:
         progress: bool = True,
         callback: Callable[[int, int, torch.Tensor], None] | None = None,
     ) -> torch.Tensor:
-        """Compute CKA similarity matrix between model layers.
-
-        Args:
-            dataloader: DataLoader for model1 (and model2 if dataloader2 is None).
-            dataloader2: Optional separate DataLoader for model2.
-            progress: Show progress bar.
-            callback: Optional callback(batch_idx, total_batches, current_matrix).
-
-        Returns:
-            CKA similarity matrix of shape (len(model1_layers), len(model2_layers)).
-
-        Raises:
-            RuntimeError: If hooks are not registered (use context manager).
-        """
         if not self._hook_handles:
             raise RuntimeError(
                 "Hooks not registered. Use 'with CKA(...) as cka:' context manager "
@@ -334,12 +293,14 @@ class CKA:
 
         with torch.no_grad():
             for batch_idx, (batch1, batch2) in enumerate(iterator):
-                self._features1.clear()
-                if not self._is_same_model:
-                    self._features2.clear()
+                self._clear_features()
 
                 x1 = self._extract_input(batch1)
-                validate_batch_size(x1.shape[0])
+                if x1.shape[0] <= 3:
+                    raise ValueError(
+                        f"HSIC requires batch size > 3, got {x1.shape[0]}. "
+                        "Increase batch size to at least 4."
+                    )
                 x1 = x1.to(self.device)
 
                 self.model1(x1)
@@ -355,10 +316,7 @@ class CKA:
                     current_cka = self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
                     callback(batch_idx, total_batches, current_cka)
 
-        cka_matrix = self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
-
-        return cka_matrix
-
+        return self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
 
     def _extract_input(self, batch: Any) -> torch.Tensor:
         if isinstance(batch, torch.Tensor):
@@ -366,26 +324,22 @@ class CKA:
         elif isinstance(batch, (list, tuple)):
             return batch[0]
         elif isinstance(batch, dict):
-            for key in ("input", "inputs", "x", "image", "images", "input_ids", "pixel_values"):
+            for key in (
+                "input",
+                "inputs",
+                "x",
+                "image",
+                "images",
+                "input_ids",
+                "pixel_values",
+            ):
                 if key in batch:
                     return batch[key]
-            raise ValueError(f"Cannot find input in dict batch. Keys: {list(batch.keys())}")
+            raise ValueError(
+                f"Cannot find input in dict batch. Keys: {list(batch.keys())}"
+            )
         else:
             raise TypeError(f"Unsupported batch type: {type(batch)}")
-
-
-    def _prepare_gram_and_self_hsic(
-        self,
-        feat: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if feat.dim() > 2:
-            feat = feat.flatten(1)
-
-        gram = compute_gram_matrix(feat)
-        hsic_self = hsic(gram, gram)
-
-        return gram, hsic_self
-
 
     def _accumulate_hsic(
         self,
@@ -393,114 +347,92 @@ class CKA:
         hsic_xx: torch.Tensor,
         hsic_yy: torch.Tensor,
     ) -> None:
-        if self._is_same_model and self.model1_layers == self.model2_layers:
-            self._accumulate_hsic_symmetric(hsic_xy, hsic_xx, hsic_yy)
-            return
-
         if self._is_same_model:
-            gram_cache: Dict[str, torch.Tensor] = {}
-            hsic_cache: Dict[str, torch.Tensor] = {}
-
-            all_layers = set(self.model1_layers) | set(self.model2_layers)
-            for layer in all_layers:
-                feat = self._features1.get(layer)
-                if feat is None:
-                    continue
-
-                gram, hsic_self = self._prepare_gram_and_self_hsic(feat)
-                gram_cache[layer] = gram
-                hsic_cache[layer] = hsic_self
-
-            for i, layer1 in enumerate(self.model1_layers):
-                if layer1 in hsic_cache:
-                    hsic_xx[i] += hsic_cache[layer1]
-
-            for j, layer2 in enumerate(self.model2_layers):
-                if layer2 in hsic_cache:
-                    hsic_yy[j] += hsic_cache[layer2]
-
-            for i, layer1 in enumerate(self.model1_layers):
-                gram1 = gram_cache.get(layer1)
-                if gram1 is None:
-                    continue
-
-                for j, layer2 in enumerate(self.model2_layers):
-                    gram2 = gram_cache.get(layer2)
-                    if gram2 is None:
-                        continue
-
-                    hsic_kl = hsic(gram1, gram2)
-                    hsic_xy[i, j] += hsic_kl
+            self._accumulate_hsic_same_model(hsic_xy, hsic_xx, hsic_yy)
         else:
-            gram1_cache: Dict[str, torch.Tensor] = {}
-            gram2_cache: Dict[str, torch.Tensor] = {}
+            self._accumulate_hsic_different_models(hsic_xy, hsic_xx, hsic_yy)
 
-            for i, layer1 in enumerate(self.model1_layers):
-                feat1 = self._features1.get(layer1)
-                if feat1 is None:
-                    continue
-
-                gram1, hsic_kk = self._prepare_gram_and_self_hsic(feat1)
-                gram1_cache[layer1] = gram1
-                hsic_xx[i] += hsic_kk
-
-            for j, layer2 in enumerate(self.model2_layers):
-                feat2 = self._features2.get(layer2)
-                if feat2 is None:
-                    continue
-
-                gram2, hsic_ll = self._prepare_gram_and_self_hsic(feat2)
-                gram2_cache[layer2] = gram2
-                hsic_yy[j] += hsic_ll
-
-            for i, layer1 in enumerate(self.model1_layers):
-                gram1 = gram1_cache.get(layer1)
-                if gram1 is None:
-                    continue
-
-                for j, layer2 in enumerate(self.model2_layers):
-                    gram2 = gram2_cache.get(layer2)
-                    if gram2 is None:
-                        continue
-
-                    hsic_kl = hsic(gram1, gram2)
-                    hsic_xy[i, j] += hsic_kl
-
-
-    def _accumulate_hsic_symmetric(
+    def _accumulate_hsic_same_model(
         self,
         hsic_xy: torch.Tensor,
         hsic_xx: torch.Tensor,
         hsic_yy: torch.Tensor,
     ) -> None:
-        gram_cache: Dict[str, torch.Tensor] = {}
-
+        feats1: list[torch.Tensor] = []
+        valid1: list[int] = []
         for i, layer in enumerate(self.model1_layers):
-            feat = self._features1.get(layer)
-            if feat is None:
-                continue
+            idx = self._layer_to_idx_shared[layer]
+            feat = self._features_shared[idx]
+            if feat is not None:
+                feats1.append(feat.flatten(1) if feat.dim() > 2 else feat)
+                valid1.append(i)
 
-            gram, hsic_self = self._prepare_gram_and_self_hsic(feat)
-            gram_cache[layer] = gram
-            hsic_xx[i] += hsic_self
-            hsic_yy[i] += hsic_self
+        feats2: list[torch.Tensor] = []
+        valid2: list[int] = []
+        for j, layer in enumerate(self.model2_layers):
+            idx = self._layer_to_idx_shared[layer]
+            feat = self._features_shared[idx]
+            if feat is not None:
+                feats2.append(feat.flatten(1) if feat.dim() > 2 else feat)
+                valid2.append(j)
 
-        for i, layer1 in enumerate(self.model1_layers):
-            gram1 = gram_cache.get(layer1)
-            if gram1 is None:
-                continue
+        if not feats1 or not feats2:
+            return
 
-            for j in range(i, len(self.model1_layers)):
-                layer2 = self.model1_layers[j]
-                gram2 = gram_cache.get(layer2)
-                if gram2 is None:
-                    continue
+        grams1 = torch.stack([torch.mm(f, f.T) for f in feats1])
+        grams2 = torch.stack([torch.mm(f, f.T) for f in feats2])
 
-                hsic_kl = hsic(gram1, gram2)
-                hsic_xy[i, j] += hsic_kl
-                if i != j:
-                    hsic_xy[j, i] += hsic_kl
+        hsic_matrix = hsic_outer(grams1, grams2)
 
+        self_hsic1 = hsic(grams1, grams1)
+        self_hsic2 = hsic(grams2, grams2)
+
+        idx1 = torch.tensor(valid1, device=hsic_xy.device)
+        idx2 = torch.tensor(valid2, device=hsic_xy.device)
+
+        i_grid, j_grid = torch.meshgrid(idx1, idx2, indexing="ij")
+        hsic_xy[i_grid, j_grid] += hsic_matrix
+        hsic_xx[idx1] += self_hsic1
+        hsic_yy[idx2] += self_hsic2
+
+    def _accumulate_hsic_different_models(
+        self,
+        hsic_xy: torch.Tensor,
+        hsic_xx: torch.Tensor,
+        hsic_yy: torch.Tensor,
+    ) -> None:
+        feats1: list[torch.Tensor] = []
+        valid1: list[int] = []
+        for i, feat in enumerate(self._features1):
+            if feat is not None:
+                feats1.append(feat.flatten(1) if feat.dim() > 2 else feat)
+                valid1.append(i)
+
+        feats2: list[torch.Tensor] = []
+        valid2: list[int] = []
+        for j, feat in enumerate(self._features2):
+            if feat is not None:
+                feats2.append(feat.flatten(1) if feat.dim() > 2 else feat)
+                valid2.append(j)
+
+        if not feats1 or not feats2:
+            return
+
+        grams1 = torch.stack([torch.mm(f, f.T) for f in feats1])
+        grams2 = torch.stack([torch.mm(f, f.T) for f in feats2])
+
+        hsic_matrix = hsic_outer(grams1, grams2)
+
+        self_hsic1 = hsic(grams1, grams1)
+        self_hsic2 = hsic(grams2, grams2)
+
+        idx1 = torch.tensor(valid1, device=hsic_xy.device)
+        idx2 = torch.tensor(valid2, device=hsic_xy.device)
+
+        i_grid, j_grid = torch.meshgrid(idx1, idx2, indexing="ij")
+        hsic_xy[i_grid, j_grid] += hsic_matrix
+        hsic_xx[idx1] += self_hsic1
+        hsic_yy[idx2] += self_hsic2
 
     def _compute_cka_matrix(
         self,
@@ -508,22 +440,13 @@ class CKA:
         hsic_xx: torch.Tensor,
         hsic_yy: torch.Tensor,
     ) -> torch.Tensor:
-        # CKA[i,j] = HSIC_xy[i,j] / sqrt(HSIC_xx[i] * HSIC_yy[j])
-        # Clamp to non-negative to handle potential negative unbiased HSIC values
-        denominator = torch.sqrt(torch.clamp(hsic_xx.unsqueeze(1) * hsic_yy.unsqueeze(0), min=0.0))
+        denominator = torch.sqrt(
+            torch.clamp(hsic_xx.unsqueeze(1) * hsic_yy.unsqueeze(0), min=0.0)
+        )
         denominator = torch.where(denominator == 0, 1e-6, denominator)
         return hsic_xy / denominator
 
-
     def export(self, cka_matrix: torch.Tensor) -> Dict[str, Any]:
-        """Export CKA results as a dictionary.
-
-        Args:
-            cka_matrix: Computed CKA matrix from compare().
-
-        Returns:
-            Dictionary containing model names, layer names, and CKA matrix.
-        """
         return {
             "model1_name": self.model1_name,
             "model2_name": self.model2_name,
@@ -532,27 +455,11 @@ class CKA:
             "cka_matrix": cka_matrix,
         }
 
-    # =========================================================================
-    # CALLABLE API
-    # =========================================================================
-
     def __call__(
         self,
         dataloader: DataLoader,
         dataloader2: DataLoader | None = None,
         **kwargs: Any,
     ) -> torch.Tensor:
-        """Compute CKA with automatic hook management.
-
-        This is a convenience method that handles context management automatically.
-
-        Args:
-            dataloader: DataLoader for model1.
-            dataloader2: Optional DataLoader for model2.
-            **kwargs: Additional arguments passed to compare().
-
-        Returns:
-            CKA similarity matrix.
-        """
         with self:
             return self.compare(dataloader, dataloader2, **kwargs)
