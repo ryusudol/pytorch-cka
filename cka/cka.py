@@ -85,17 +85,9 @@ class CKA:
         self.model1_layer_to_module = self._resolve_layers(self.model1, model1_layers, "model1")
         self.model2_layer_to_module = self._resolve_layers(self.model2, model2_layers, "model2")
 
-        if device is None:
-            if torch.cuda.is_available():
-                self.device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                self.device = torch.device("mps")
-            else:
-                self.device = torch.device("cpu")
-                if len(self.model1_layer_to_module) > 50 or len(self.model2_layer_to_module) > 50:
-                    warnings.warn("Running on CPU with many layers; consider GPU for speedup.")
-        else:
-            self.device = torch.device(device)
+        self.device = torch.device(
+            device if device else "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
         self.model1 = self.model1.to(self.device)
         self.model2 = self.model2.to(self.device)
