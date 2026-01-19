@@ -24,6 +24,9 @@ pip install pytorch-cka
 # Using uv
 uv add pytorch-cka
 
+# Using docker
+docker pull ghcr.io/ryusudol/pytorch-cka
+
 # From source
 git clone https://github.com/ryusudol/Centered-Kernel-Alignment
 cd pytorch-cka
@@ -36,7 +39,7 @@ uv sync  # or: pip install -e .
 
 ```python
 from torch.utils.data import DataLoader
-from pytorch_cka import CKA
+from cka import CKA
 
 pretrained_model = ...  # e.g. pretrained ResNet-18
 fine_tuned_model = ...  # e.g. fine-tuned ResNet-18
@@ -70,7 +73,7 @@ with cka:
 **Heatmap**
 
 ```python
-from pytorch_cka import plot_cka_heatmap
+from cka import plot_cka_heatmap
 
 fig, ax = plot_cka_heatmap(
     cka_matrix,
@@ -100,7 +103,7 @@ fig, ax = plot_cka_heatmap(
 **Trend Plot**
 
 ```python
-from pytorch_cka import plot_cka_trend
+from cka import plot_cka_trend
 
 # Plot diagonal (self-similarity across layers)
 diagonal = torch.diag(matrix)
@@ -126,7 +129,7 @@ fig, ax = plot_cka_trend(
 <!-- **Side-by-Side Comparison**
 
 ```python
-from pytorch_cka import plot_cka_comparison
+from cka import plot_cka_comparison
 
 fig, axes = plot_cka_comparison(
     matrices=[matrix1, matrix2, matrix3],

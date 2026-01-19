@@ -1,9 +1,17 @@
+# Git
+.git/
+.gitignore
+
+# Claude Code
+.claude/
+CLAUDE.md
+
 # Virtual environments
 .venv/
 venv/
 env/
 
-# Python
+# Python cache and build artifacts
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,12 +28,13 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
+wheels/ 
 *.egg-info/
 .installed.cfg
 *.egg
 
 # Testing
+tests/
 .pytest_cache/
 .coverage
 htmlcov/
@@ -43,7 +52,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Example outputs
+# Example outputs and images
 *.png
 *.jpg
 *.jpeg
@@ -51,10 +60,22 @@ cka_checkpoint.pt
 
 # Jupyter
 .ipynb_checkpoints/
+examples/
 
+# mypy
 .mypy_cache/
+
+# ruff
 .ruff_cache/
-.claude/
-CLAUDE.md
+
+# Package manager
 uv.lock
-tests/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# CI/CD
+.github/
+.pre-commit-config.yaml
+.python-version

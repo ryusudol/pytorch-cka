@@ -1,7 +1,7 @@
 [project]
 name = "pytorch_cka"
 version = "0.1.2"
-description = "Centered Kernel Alignment for PyTorch models"
+description = "Centered Kernel Alignment (CKA) with Efficient Computation and Layer-wise Visualization for PyTorch "
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -17,6 +17,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",                                                      
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
@@ -28,19 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ryusudol/pytorch-cka"
-Repository = "https://github.com/ryusudol/pytorch-cka"
-Issues = "https://github.com/ryusudol/pytorch-cka/issues"
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "ruff>=0.1.0",
-]
+Homepage = "https://github.com/ryusudol/Centered-Kernel-Alignment"
+Repository = "https://github.com/ryusudol/Centered-Kernel-Alignment"
+Issues = "https://github.com/ryusudol/Centered-Kernel-Alignment/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -52,14 +44,6 @@ packages = ["cka"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
-
-[tool.black]
-line-length = 100
-target-version = ["py310"]
-
-[tool.isort]
-profile = "black"
-line_length = 100
 
 [tool.mypy]
 python_version = "3.10"
@@ -77,4 +61,7 @@ dev = [
     "torchvision>=0.15.0",
     "timm>=1.0.0",
     "transformers>=4.30.0",
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.10",
+    "mypy>=1.19.1",
 ]
