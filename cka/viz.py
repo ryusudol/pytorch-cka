@@ -128,12 +128,12 @@ def plot_cka_heatmap(
 
     # Set tick labels
     if layers1 is not None:
-        shortened = [shorten_name(l, layer_name_depth) for l in layers1]
+        shortened = [shorten_name(layer, layer_name_depth) for layer in layers1]
         ax.set_yticks(range(n_layers1))
         ax.set_yticklabels(shortened, fontsize=tick_fontsize)
 
     if layers2 is not None:
-        shortened = [shorten_name(l, layer_name_depth) for l in layers2]
+        shortened = [shorten_name(layer, layer_name_depth) for layer in layers2]
         ax.set_xticks(range(n_layers2))
         ax.set_xticklabels(shortened, fontsize=tick_fontsize, rotation=45, ha="right")
 
@@ -197,7 +197,11 @@ def plot_cka_trend(
     """
     # Normalize input to list of arrays
     if isinstance(cka_values, (torch.Tensor, np.ndarray)):
-        arr = cka_values.detach().cpu().numpy() if isinstance(cka_values, torch.Tensor) else cka_values
+        arr = (
+            cka_values.detach().cpu().numpy()
+            if isinstance(cka_values, torch.Tensor)
+            else cka_values
+        )
         if arr.ndim == 1:
             cka_values = [arr]
         else:
@@ -304,6 +308,7 @@ def plot_cka_trend_with_range(
     Returns:
         Tuple of (Figure, Axes).
     """
+
     # Convert to numpy
     def to_numpy(arr):
         if isinstance(arr, torch.Tensor):
