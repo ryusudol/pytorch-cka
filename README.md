@@ -2,7 +2,7 @@
 
 # Centered Kernel Alignment (CKA)
 
-**Lightning-fast, Memory-efficient, and Numerically Stable CKA for PyTorch**
+**Fast, Memory-efficient, and Stable CKA Library for PyTorch**
 
 </div>
 
