@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://pypi.org/project/pytorch-cka/)
 [![CI](https://github.com/ryusudol/Centered-Kernel-Alignment/workflows/CI/badge.svg)](https://github.com/ryusudol/Centered-Kernel-Alignment/actions)
 
-**Lightning-fast, Memory-efficient, and Numerically Stable CKA for PyTorch**
+**Fast and Memory-efficient CKA Library for PyTorch**
 
 </div>
 
