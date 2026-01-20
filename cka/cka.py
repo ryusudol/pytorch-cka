@@ -188,7 +188,7 @@ class CKA:
     ) -> torch.Tensor:
         denominator = torch.sqrt(torch.clamp(hsic_xx.unsqueeze(1) * hsic_yy.unsqueeze(0), min=0.0))
         denominator = torch.where(denominator == 0, 1e-6, denominator)
-        return hsic_xy / denominator
+        return torch.clamp(hsic_xy / denominator, min=0.0, max=1.0)
 
     def _make_hook(
         self,
