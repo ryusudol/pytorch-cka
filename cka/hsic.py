@@ -17,7 +17,9 @@ def hsic(
         raise ValueError("hsic_all requires square matrices")
 
     if n != n_y:
-        raise ValueError(f"Gram matrices must have same sample dimension, got {n} and {n_y}")
+        raise ValueError(
+            f"Gram matrices must have same sample dimension, got {n} and {n_y}"
+        )
 
     if n <= 3:
         raise ValueError(f"hsic_all requires n > 3, got n={n}")
@@ -75,7 +77,9 @@ def hsic_outer(
         raise ValueError("hsic_outer requires square matrices")
 
     if n != n_y:
-        raise ValueError(f"Gram matrices must have same sample dimension, got {n} and {n_y}")
+        raise ValueError(
+            f"Gram matrices must have same sample dimension, got {n} and {n_y}"
+        )
 
     if n <= 3:
         raise ValueError(f"hsic_outer requires n > 3, got n={n}")

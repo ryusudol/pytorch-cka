@@ -9,8 +9,6 @@ from tqdm import tqdm
 
 from .hsic import hsic, hsic_outer
 
-EPS = 1e-6
-
 
 class CKA:
     @staticmethod
@@ -82,8 +80,12 @@ class CKA:
         self.model1_name = model1_name or self.model1.__class__.__name__
         self.model2_name = model2_name or self.model2.__class__.__name__
 
-        self.model1_layer_to_module = self._resolve_layers(self.model1, model1_layers, "model1")
-        self.model2_layer_to_module = self._resolve_layers(self.model2, model2_layers, "model2")
+        self.model1_layer_to_module = self._resolve_layers(
+            self.model1, model1_layers, "model1"
+        )
+        self.model2_layer_to_module = self._resolve_layers(
+            self.model2, model2_layers, "model2"
+        )
 
         self.device = torch.device(
             device if device else "cuda" if torch.cuda.is_available() else "cpu"
@@ -116,21 +118,26 @@ class CKA:
             self._model1_layer_to_feature.clear()
             self._model2_layer_to_feature.clear()
 
-    def _compute_gram(self, feat: torch.Tensor) -> torch.Tensor:
-        std, mean = torch.std_mean(feat, dim=0, keepdim=True)
-        feat_std = (feat - mean) / (std + EPS)
-        return torch.mm(feat_std, feat_std.T)
-
     def _extract_input(self, batch: Any) -> torch.Tensor:
         if isinstance(batch, torch.Tensor):
             return batch
         elif isinstance(batch, (list, tuple)):
             return batch[0]
         elif isinstance(batch, dict):
-            for key in ("input", "inputs", "x", "image", "images", "input_ids", "pixel_values"):
+            for key in (
+                "input",
+                "inputs",
+                "x",
+                "image",
+                "images",
+                "input_ids",
+                "pixel_values",
+            ):
                 if key in batch:
                     return batch[key]
-            raise ValueError(f"Cannot find input in dict batch. Keys: {list(batch.keys())}")
+            raise ValueError(
+                f"Cannot find input in dict batch. Keys: {list(batch.keys())}"
+            )
         else:
             raise TypeError(f"Unsupported batch type: {type(batch)}")
 
@@ -145,11 +152,15 @@ class CKA:
             layer_to_idx = {}
             for idx, (layer, feat) in enumerate(self._shared_features.items()):
                 layer_to_idx[layer] = idx
-                grams.append(self._compute_gram(feat))
+                grams.append(torch.mm(feat, feat.T))
             grams = torch.stack(grams)
 
-            grams1 = grams[[layer_to_idx[layer] for layer in self.model1_layer_to_module]]
-            grams2 = grams[[layer_to_idx[layer] for layer in self.model2_layer_to_module]]
+            grams1 = grams[
+                [layer_to_idx[layer] for layer in self.model1_layer_to_module]
+            ]
+            grams2 = grams[
+                [layer_to_idx[layer] for layer in self.model2_layer_to_module]
+            ]
 
             if self.model1_layer_to_module.keys() == self.model2_layer_to_module.keys():
                 hsic_matrix = hsic_outer(grams1, grams2)
@@ -163,13 +174,19 @@ class CKA:
         else:
             grams1 = torch.stack(
                 [
-                    self._compute_gram(self._model1_layer_to_feature[layer])
+                    torch.mm(
+                        self._model1_layer_to_feature[layer],
+                        self._model1_layer_to_feature[layer].T,
+                    )
                     for layer in self.model1_layer_to_module
                 ]
             )
             grams2 = torch.stack(
                 [
-                    self._compute_gram(self._model2_layer_to_feature[layer])
+                    torch.mm(
+                        self._model2_layer_to_feature[layer],
+                        self._model2_layer_to_feature[layer].T,
+                    )
                     for layer in self.model2_layer_to_module
                 ]
             )
@@ -186,7 +203,9 @@ class CKA:
         hsic_xx: torch.Tensor,
         hsic_yy: torch.Tensor,
     ) -> torch.Tensor:
-        denominator = torch.sqrt(torch.clamp(hsic_xx.unsqueeze(1) * hsic_yy.unsqueeze(0), min=0.0))
+        denominator = torch.sqrt(
+            torch.clamp(hsic_xx.unsqueeze(1) * hsic_yy.unsqueeze(0), min=0.0)
+        )
         denominator = torch.where(denominator == 0, 1e-6, denominator)
         return torch.clamp(hsic_xy / denominator, min=0.0, max=1.0)
 
@@ -291,7 +310,9 @@ class CKA:
 
         if self._is_same_model:
             for name, module in self._shared_layer_to_module.items():
-                handle = module.register_forward_hook(self._make_hook(self._shared_features, name))
+                handle = module.register_forward_hook(
+                    self._make_hook(self._shared_features, name)
+                )
                 self._hook_handles.append(handle)
         else:
             for name, module in self.model1_layer_to_module.items():

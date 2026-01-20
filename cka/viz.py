@@ -420,7 +420,9 @@ def plot_cka_comparison(
     if figsize is None:
         figsize = (5 * ncols, 4 * nrows)
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=share_colorbar)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=figsize, constrained_layout=share_colorbar
+    )
     axes = np.atleast_2d(axes)
 
     # Find global min/max for shared colorbar
