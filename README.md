@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://pypi.org/project/pytorch-cka/)
 [![CI](https://github.com/ryusudol/Centered-Kernel-Alignment/workflows/CI/badge.svg)](https://github.com/ryusudol/Centered-Kernel-Alignment/actions)
 
-**The Fastest Python Library for CKA with Built-in Visualization**
+**The Fastest, Memory-efficient Python Library for CKA with Built-in Visualization**
 
 </div>
 
