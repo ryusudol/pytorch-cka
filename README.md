@@ -12,7 +12,7 @@
 
 
 <p align="center">
-    <img alt="A bar chart with benchmark results." src="docs/assets/bar-chart.png" width="100%" />
+    <img alt="A bar chart with benchmark results." src="https://github.com/user-attachments/assets/9653d0fb-fc23-4eb7-a657-b94ba6d3e25e" width="100%" />
 </p>
 
 <p align="center">
@@ -105,8 +105,8 @@ fig, ax = plot_cka_heatmap(
 
 <table>
     <tr>
-      <td><img src="examples/plots/heatmap_self.png" alt="Self-comparison heatmap" width="100%"/></td>
-      <td><img src="examples/plots/heatmap_cross.png" alt="Cross-model comparison heatmap" width="100%"/></td>
+      <td><img src="https://github.com/user-attachments/assets/f74a322d-1a19-4c4f-b1a2-07f238651512" alt="Self-comparison heatmap" width="100%"/></td>
+      <td><img src="https://github.com/user-attachments/assets/2121976c-c230-40b0-92d5-c48b5bf876c9" alt="Cross-model comparison heatmap" width="100%"/></td>
       <!-- <td><img src="plots/heatmap_masked.png" alt="Masked upper triangle heatmap" width="100%"/></td> -->
     </tr>
     <tr>
@@ -133,8 +133,8 @@ fig, ax = plot_cka_trend(
 
 <table>
     <tr>
-      <td><img src="examples/plots/line_cross_model_convergence.png" alt="Cross model CKA scores trends" width="100%"/></td>
-      <td><img src="examples/plots/trend_multi.png" alt="Multiple trends comparison" width="100%"/></td>
+      <td><img src="https://github.com/user-attachments/assets/d5a42b85-36a4-4778-a13d-1a3a76f55b10" alt="Cross model CKA scores trends" width="100%"/></td>
+      <td><img src="https://github.com/user-attachments/assets/6af56561-1e1d-45a9-8af7-796ae5e434d0" alt="Multiple trends comparison" width="100%"/></td>
     </tr>
     <tr>
       <td align="center">Cross Model CKA Scores Trends</td>
