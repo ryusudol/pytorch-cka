@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/pytorch-cka.svg)](https://pypi.org/project/pytorch-cka/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://pypi.org/project/pytorch-cka/)
 [![CI](https://github.com/ryusudol/Centered-Kernel-Alignment/workflows/CI/badge.svg)](https://github.com/ryusudol/Centered-Kernel-Alignment/actions)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/pytorch-cka?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=RED&left_text=downloads)](https://pepy.tech/projects/pytorch-cka)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/pytorch-cka?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=RED&left_text=downloads)](https://pepy.tech/projects/pytorch-cka)
 
 **The Fastest, Memory-efficient Python Library for CKA with Built-in Visualization**
 
