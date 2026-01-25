@@ -336,19 +336,16 @@ class TestCompare:
 
         assert result.shape == (3, 3)
 
-    def test_callback_called(self, model1, model2, dataloader):
+    def test_verbose_output(self, model1, model2, dataloader, capsys):
         cka = CKA(model1, model2)
-        callback_calls = []
 
-        def callback(batch_idx, total_batches, cka_matrix):
-            callback_calls.append((batch_idx, total_batches, cka_matrix.clone()))
+        result = cka(dataloader, verbose=True, progress=False)
 
-        result = cka(dataloader, callback=callback)
-
-        assert len(callback_calls) == 4
-        assert callback_calls[0][0] == 0
-        assert callback_calls[0][1] == 4
-        assert callback_calls[-1][2].shape == result.shape
+        captured = capsys.readouterr()
+        assert "Batch 1/4" in captured.out
+        assert "Batch 4/4" in captured.out
+        assert "Mean CKA:" in captured.out
+        assert result.shape[0] > 0
 
     def test_two_dataloaders(self, model1, model2, dataloader):
         x2 = torch.randn(32, 10)

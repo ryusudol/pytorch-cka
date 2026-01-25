@@ -57,3 +57,5 @@ cka_checkpoint.pt
 .claude/
 CLAUDE.md
 uv.lock
+
+*.pdf

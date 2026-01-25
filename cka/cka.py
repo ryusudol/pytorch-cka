@@ -242,7 +242,7 @@ class CKA:
         dataloader: DataLoader,
         dataloader2: DataLoader | None = None,
         progress: bool = True,
-        callback: Callable[[int, int, torch.Tensor], None] | None = None,
+        verbose: bool = False,
     ) -> torch.Tensor:
         if not self._hook_handles:
             raise RuntimeError("Hooks not registered.")
@@ -296,9 +296,11 @@ class CKA:
 
                 self._accumulate_hsic(hsic_xy, hsic_xx, hsic_yy)
 
-                if callback is not None:
+                if verbose:
                     current_cka = self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
-                    callback(batch_idx, total_batches, current_cka)
+                    print(
+                        f"Batch {batch_idx + 1}/{total_batches} - Mean CKA: {current_cka.mean().item():.4f}"
+                    )
 
         return self._compute_cka_matrix(hsic_xy, hsic_xx, hsic_yy)
 
